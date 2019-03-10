@@ -1,0 +1,249 @@
+---
+title: "BIOS824 Project 1 (by Kuei/Clint)"
+output: 
+    flexdashboard::flex_dashboard:
+        orientation: rows
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(stringr)
+```
+
+```{r}
+###
+FP_LGG = "/data/Duke_BIOS824/LGG-segmentation"
+
+###
+patients = grep("TCGA", dir(FP_LGG), value = TRUE)
+lst_patients = as.list(patients)
+names(lst_patients) = patients
+```
+
+Introduction
+===========================
+
+row
+---------------------------
+
+### Glioma
+
+**What is Glioma?**
+
+ Glioma is a type of cancer that develops in the glial cells of the brain. Glial cells support the brain’s nerve cells and keep them healthy. **Tumors are classified into grades I, II, III or IV based on standards set by the World Health Organization**. For this study, TCGA studied **<font color="red">lower grade glioma, which consists of grades II and III</font>**. Grade IV is a malignant glioma called Glioblastoma multiforme (GBM), the most aggressive and most common primary brain tumor.
+
+Regardless of grade, as a glioma tumor grows, **<font color="red">it compresses the normal brain tissue, frequently causing disabling or fatal effects.</font>** In 2010, more than 22,000 Americans were estimated to have been diagnosed and 13,140 were estimated to have died from brain and other nervous system cancers.
+
+**Glioma may arise from different types of Glial cells**
+
+- *Astrocyte* - transports nutrients and holds neurons in place
+- *Oligodendrocyte* - provides insulation (myelin) to neurons
+- *Microglia* - digests dead neurons and pathogens
+- *Ependymal cells* - line the ventricles and secrete cerebrospinal fluid
+
+**Reference**
+
+- [TCGA | What is lower grade glioma?](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga/studied-cancers/glioma)
+- [Glioma Brain Tumor](https://www.mayfieldclinic.com/PE-Glioma.htm)
+
+### Example Figure
+
+![](https://www.frontiersin.org/files/Articles/147166/fneur-06-00137-HTML/image_m/fneur-06-00137-g001.jpg)
+
+### Figure Legend
+
+"Figure (A) MRI FLAIR sequence showing a left frontal astrocytoma grade II located in a non-eloquent area with mainly cortical location, in a 38-year-old female. (B) MRI FLAIR sequence showing an insular oligodendroglioma grade II, located affecting cortical and subcortical regions, in a 27-year-old male."
+
+(~ from study [Smits et al. 2015](https://www.frontiersin.org/articles/10.3389/fneur.2015.00137/full))
+
+
+row
+---------------------------
+
+### Data Description
+
+This dataset contains brain MR images together with manual FLAIR abnormality segmentation masks.
+The images were obtained from The Cancer Imaging Archive (TCIA).
+
+They correspond to **110 patients** included in The Cancer Genome Atlas (TCGA) lower-grade glioma collection with at least **<font color="red">fluid-attenuated inversion recovery (FLAIR)</font>** sequence and genomic cluster data available.
+
+
+### File/Data Structure
+
+Tumor genomic clusters and patient data is provided in `data.csv` file.
+
+All images are provided in `.tif` format with 3 channels per image. For 101 cases, 3 sequences are available, i.e. pre-contrast, FLAIR, post-contrast (in this order of channels).
+
+For 9 cases, post-contrast sequence is missing and for 6 cases, pre-contrast sequence is missing.
+**Missing sequences are replaced with FLAIR sequence to make all images 3-channel.**
+
+**<font color="red">Masks</font>** are binary, 1-channel images. They **segment FLAIR abnormality present in the FLAIR sequence** (available for all cases).
+
+The dataset is organized into 110 folders named after case ID that contains information about source institution. Each folder contains MR images with the following naming convention:
+
+`TCGA_<institution-code>_<patient-id>_<slice-number>.tif`
+
+Corresponding masks have a `_mask` suffix.
+
+### Task
+
+1. The link to the data was sent to you by a person from my lab on Duke Box
+
+2. Your task is to predict two labels:
+    - **<font color="red">COCCluster</font>**
+    - **<font color="red">neoplasm_histologic_grade</font>**
+
+3. You should do a **<font color="red">10-fold crossvalidation</font>** and report pooling and averaging performance of your best model as well as some models that did not work as well
+
+4. Report performance in terms of area under the **<font color="red">ROC</font>**. For the problem that is **multi-class show 1 class vs. all other classes** performance for all the classes.
+
+5. Explain your final model including how you trained it, did you **normalize and augment** the data etc.
+
+6. Explain which aspects of your model improved performance and why you think that is
+
+7. **Present in PowerPoint**, about 10 minutes per person + questions
+
+
+
+Visualize Image
+============================
+
+Column {.sidebar}
+---------------------------
+
+
+```{r}
+###
+get_pat_id    = reactive({input$pat_id})
+get_slice_idx = reactive({input$idx_slice})
+
+###
+get_img_slice = reactive({
+    patient = get_pat_id()
+    idx_slice = get_slice_idx()
+    
+    fname = paste0(patient, "_", idx_slice, ".tif")
+    fpath = file.path(FP_LGG, patient, fname)
+    bioimagetools::readTIF(fpath)
+})
+
+get_img_mask = reactive({
+    patient = get_pat_id()
+    idx_slice = get_slice_idx()
+    
+    fname = paste0(patient, "_", idx_slice, "_mask.tif")
+    fpath = file.path(FP_LGG, patient, fname)
+    bioimagetools::readTIF(fpath)
+})
+
+
+###
+selectInput("pat_id", label = h3("Patient ID"), 
+    choices = lst_patients, 
+    selected = "TCGA_CS_4941_19960909")
+
+###
+renderUI({
+    fpath = file.path(FP_LGG, get_pat_id())
+    num_slice = sum(grepl("mask", dir(fpath)))
+    sliderInput(
+        "idx_slice", h4("Slices"), 
+        min = 1, max = num_slice, 
+        step = 1, value = 1,
+        animate = animationOptions(interval = 1000, loop = TRUE))
+})
+
+###
+renderUI({
+    patient = get_pat_id()
+    idx_slice = get_slice_idx()
+    fname = paste0(patient, "_", idx_slice, ".tif")
+    fpath = file.path(FP_LGG, patient, fname)
+    
+    str1 <- paste("The patient you selected", get_pat_id())
+    str2 <- paste("The slice you choose",  get_slice_idx())
+    
+    str3 <- paste(dim(get_img_slice()), collapse = " ")
+    str3 <- paste("Dim of Image:", str3)
+    #str3 = fname
+    
+    str4 <- paste(dim(get_img_mask()), collapse = " ")
+    str4 <- paste("Dim of Mask:", str4)
+    #str4 <- fpath
+    
+    HTML(paste(str1, str2, str3, str4, sep = '<br/><br/>'))
+})
+```
+
+
+Row
+---------------------------
+
+### Pre-Contrast
+
+```{r, fig.width=5, fig.height=5}
+renderPlot({
+    my_img = get_img_slice()[,,1,1]
+    bioimagetools::img(my_img, col="grey")
+})
+```
+
+### FLAIR
+```{r, fig.width=5, fig.height=5}
+renderPlot({
+    my_img = get_img_slice()[,,2,1]
+    bioimagetools::img(my_img, col="grey")
+})
+```
+
+
+### Post-Contrast
+```{r, fig.width=5, fig.height=5}
+renderPlot({
+    my_img = get_img_slice()[,,3,1]
+    bioimagetools::img(my_img, col="grey")
+})
+```
+
+
+Row
+---------------------------
+
+### Combine All Channels
+```{r, fig.width=5, fig.height=5}
+renderPlot({
+    my_img = get_img_slice()[,,,1]
+    bioimagetools::img(my_img, col="rgb")
+})
+```
+
+### Segmentation Masks
+```{r, fig.width=5, fig.height=5}
+renderPlot({
+    my_img = get_img_mask()[,,1]
+    bioimagetools::img(my_img, col="grey")
+})
+```
+
+
+Analysis
+===========================
+
+Row {.tabset}
+---------------------------
+
+### Chart 2A
+
+### Chart 2B
+
+
+Evaluation
+===========================
+
+### Chart 3A
+
+### Chart 3B
+
+

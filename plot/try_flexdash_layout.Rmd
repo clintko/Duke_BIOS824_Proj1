@@ -1,0 +1,69 @@
+---
+title: "Untitled"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+
+# Dashboard 01 {data-navmenu="Menu A"}
+
+## Column {.sidebar}
+---------------------------
+
+### side 01
+
+```{r}
+
+```
+
+### side 02
+
+```{r}
+
+```
+
+## Row
+-----------------------------------------------------------------------
+
+### Chart 1A
+
+```{r}
+
+```
+
+### Chart 1B
+
+```{r}
+
+```
+
+
+# Dashboard 02 {data-navmenu="Menu A"}
+
+## Row
+
+
+### Chart 2A
+
+```{r}
+
+```
+
+### Chart 2B
+
+```{r}
+
+```
+
+# Dashboard 03 {data-navmenu="Menu B"}
+
+
+# Dashboard 04 {data-navmenu="Menu B"}
+
+

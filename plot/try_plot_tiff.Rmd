@@ -1,0 +1,57 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+FP_LGG = "/data/Duke_BIOS824/LGG-segmentation/"
+patient = "TCGA_CS_4941_19960909"
+fname = paste0(patient, "_1", ".tif")
+fpath = file.path(FP_LGG, patient, fname)
+```
+
+```{r}
+my_img <- bioimagetools::readTIF(fpath)
+```
+
+```{r}
+dim(my_img)
+```
+
+```{r}
+tmp = my_img[,,,1]
+dim(tmp)
+```
+
+
+```{r}
+bioimagetools::img(tmp, col="rgb")
+```
+
+
+
+```{r}
+my_img = tiff(fpath, width = 256, height = 256)
+```
+
+```{r}
+cell <- bioimagetools::readTIF("http://ex.volkerschmid.de/cell.tif")
+```
+
+```{r}
+print(dim(cell))
+```
+
+```{r}
+print(attributes(cell)$dim)
+```
+
+```{r}
+print(attributes(cell)$bits.per.sample)
+```
+
+```{r}
+bioimagetools::img(cell, z=25 ,col="rgb")
+```
+
