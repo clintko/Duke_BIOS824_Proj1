@@ -7,19 +7,27 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
+library(tidyverse)
+
 library(flexdashboard)
 library(shiny)
+library(plotly)
 library(stringr)
 ```
 
 ```{r}
 ###
 FP_LGG = "/data/Duke_BIOS824/LGG-segmentation"
+#FP_DAT = "/home/clint/GitRepo/Duke_BIOS824_Proj1/data"
+FP_DAT = "/data/Duke_BIOS824/res_proj01"
 
 ###
 patients = grep("TCGA", dir(FP_LGG), value = TRUE)
 lst_patients = as.list(patients)
 names(lst_patients) = patients
+
+###
+label = readr::read_csv(file.path(FP_DAT, "label.csv"))
 ```
 
 Introduction
@@ -107,7 +115,7 @@ Corresponding masks have a `_mask` suffix.
 
 
 
-Visualize Image
+Visualize Raw Image
 ============================
 
 Column {.sidebar}
@@ -116,8 +124,9 @@ Column {.sidebar}
 
 ```{r}
 ###
-get_pat_id    = reactive({input$pat_id})
-get_slice_idx = reactive({input$idx_slice})
+get_pat_id         = reactive({input$pat_id})
+get_slice_idx      = reactive({input$idx_slice})
+get_slice_idx_init = reactive({input$idx_slice_init})
 
 ###
 get_img_slice = reactive({
@@ -129,6 +138,7 @@ get_img_slice = reactive({
     bioimagetools::readTIF(fpath)
 })
 
+###
 get_img_mask = reactive({
     patient = get_pat_id()
     idx_slice = get_slice_idx()
@@ -145,13 +155,18 @@ selectInput("pat_id", label = h3("Patient ID"),
     selected = "TCGA_CS_4941_19960909")
 
 ###
+selectInput("idx_slice_init", label = h3("Slice Initial Index"), 
+    choices = 1:20, 
+    selected = 1)
+
+###
 renderUI({
     fpath = file.path(FP_LGG, get_pat_id())
     num_slice = sum(grepl("mask", dir(fpath)))
     sliderInput(
         "idx_slice", h4("Slices"), 
         min = 1, max = num_slice, 
-        step = 1, value = 1,
+        step = 1, value = get_slice_idx_init(),
         animate = animationOptions(interval = 1000, loop = TRUE))
 })
 
@@ -228,15 +243,131 @@ renderPlot({
 ```
 
 
-Analysis
+Compare & Explore
 ===========================
 
-Row {.tabset}
+Row
 ---------------------------
 
 ### Chart 2A
 
+```{r}
+get_pat_id_plotly1 = reactive({input$pat_id_plotly1})
+
+selectInput("pat_id_plotly1", label = h3("Patient ID"), 
+    choices = lst_patients, 
+    selected = "TCGA_CS_4941_19960909")
+```
+
+```{r}
+renderPlotly({
+    patient = get_pat_id_plotly1()
+    pat_id  = str_extract(string = patient, pattern = "TCGA_[A-Z]*_[A-Z0-9]*")
+    pat_lab = label %>% filter(Patient == pat_id)
+    
+    title = paste(names(pat_lab), pat_lab, sep = ": ")
+    title = paste(title, collapse = "\n")
+    
+    fname = paste0(patient, "_slice.csv")
+    fpath = file.path(FP_DAT, "coord", fname)
+    cord_slice = read_csv(fpath)
+    cord_slice$val = "Head"
+    cord_slice$size = 1
+    
+    fname = paste0(patient, "_mask.csv")
+    fpath = file.path(FP_DAT, "coord", fname)
+    cord_mask  = read_csv(fpath)
+    cord_mask$val = "Tumor"
+    cord_mask$size = 10
+
+    cord = bind_rows(cord_slice, cord_mask)
+    
+    axx = list(nticks = 10, range = c(0,256))
+    axy = list(nticks = 10, range = c(0,256))
+    axz = list(nticks = 10, range = c(min(cord_slice$z), max(cord_slice$z) + 5))
+    cs  = c("#084594", "#ef3b2c") # blue, red
+    
+    plot_ly(cord, x = ~x, y = ~y, z = ~z, 
+        color = ~val, colors = cs,
+        size = ~size, sizes = c(5, 7),
+        marker = list(
+            symbol = 'circle', 
+            sizemode = 'diameter',
+            opacity = 0.3)) %>% 
+        add_markers() %>%
+        layout(
+            title = paste(title),
+            scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+})
+```
+
+
 ### Chart 2B
+
+```{r}
+get_pat_id_plotly2 = reactive({input$pat_id_plotly2})
+
+selectInput("pat_id_plotly2", label = h3("Patient ID"), 
+    choices = lst_patients, 
+    selected = "TCGA_CS_4941_19960909")
+```
+
+```{r}
+renderPlotly({
+    patient = get_pat_id_plotly2()
+    pat_id  = str_extract(string = patient, pattern = "TCGA_[A-Z]*_[A-Z0-9]*")
+    pat_lab = label %>% filter(Patient == pat_id)
+    
+    title = paste(names(pat_lab), pat_lab, sep = ": ")
+    title = paste(title, collapse = "\n")
+    
+    fname = paste0(patient, "_slice.csv")
+    fpath = file.path(FP_DAT, "coord", fname)
+    cord_slice = read_csv(fpath)
+    cord_slice$val = "Head"
+    cord_slice$size = 1
+    
+    fname = paste0(patient, "_mask.csv")
+    fpath = file.path(FP_DAT, "coord", fname)
+    cord_mask  = read_csv(fpath)
+    cord_mask$val = "Tumor"
+    cord_mask$size = 10
+
+    cord = bind_rows(cord_slice, cord_mask)
+    
+    axx = list(nticks = 10, range = c(0,256))
+    axy = list(nticks = 10, range = c(0,256))
+    axz = list(nticks = 10, range = c(min(cord_slice$z), max(cord_slice$z) + 5))
+    cs  = c("#084594", "#ef3b2c") # blue, red
+    
+    plot_ly(cord, x = ~x, y = ~y, z = ~z, 
+        color = ~val, colors = cs,
+        size = ~size, sizes = c(5, 7),
+        marker = list(
+            symbol = 'circle', 
+            sizemode = 'diameter',
+            opacity = 0.3)) %>% 
+        add_markers() %>%
+        layout(
+            title = paste(title),
+            scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+})
+```
+
+
+### Chart 2C
+
+```{r}
+DT::renderDataTable(label, options = list(scrollY = TRUE))
+```
+
+
+Build Model
+===========================
+
+### Chart 3A
+
+### Chart 3B
 
 
 Evaluation

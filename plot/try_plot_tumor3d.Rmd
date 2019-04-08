@@ -1,0 +1,92 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(reticulate)
+use_python("/opt/anaconda3/bin/python")
+py_config()
+```
+
+```{python}
+##############################################################
+import numpy as np
+import pandas as pd
+import os, re
+import matplotlib.pyplot as plt
+
+##############################################################
+def get_fname(patient, is_mask = False):
+    fpath = os.path.join(FP_LGG, patient)
+    if is_mask:
+        pattern = "_([^_]*)_mask.tif$"
+        fname = np.array([x for x in os.listdir(fpath) if "mask" in x])
+    else:
+        pattern = "_([^_]*).tif$"
+        fname = np.array([x for x in os.listdir(fpath) if "mask" not in x])
+    index = np.array([int(re.findall(pattern, x)[0]) for x in fname])
+    idx = np.argsort(index)
+    return fname[idx]
+
+##############################################################
+FP_LGG = "/data/Duke_BIOS824/LGG-segmentation/"
+patients = [x for x in os.listdir(FP_LGG) if "TCGA" in x]    
+patient = 'TCGA_CS_4941_19960909'
+
+##############################################################
+img_slice, img_mask = dict(), dict()
+
+lst = get_fname(patient, is_mask = True)
+img = [plt.imread(os.path.join(FP_LGG, patient, fname)) for fname in lst]
+img_mask[patient]  = np.array(img)
+    
+lst = get_fname(patient, is_mask = False)
+img = [plt.imread(os.path.join(FP_LGG, patient, fname)) for fname in lst]
+img_slice[patient] = np.array(img)
+
+##############################################################
+fig, axes = plt.subplots(ncols=4, nrows=6, figsize = (2*4, 2*6))
+axes = axes.ravel()
+
+mask    = img_mask[patient]
+num_img = mask.shape[0]
+
+for idx in range(num_img):
+    axes[idx].imshow(mask[idx])
+
+plt.show()
+#print(img_mask[patient].shape)
+```
+
+# Try using R
+
+```{r}
+FP_LGG = "/data/Duke_BIOS824/LGG-segmentation/"
+patient = "TCGA_CS_4941_19960909"
+fname = paste0(patient, "_1", ".tif")
+fpath = file.path(FP_LGG, patient, fname)
+my_img <- bioimagetools::readTIF(fpath)
+```
+
+```{r}
+dim(my_img)
+```
+
+
+```{r}
+library(plotly)
+
+mtcars$am[which(mtcars$am == 0)] <- 'Automatic'
+mtcars$am[which(mtcars$am == 1)] <- 'Manual'
+mtcars$am <- as.factor(mtcars$am)
+
+p <- plot_ly(mtcars, x = ~wt, y = ~hp, z = ~qsec, color = ~am, colors = c('#BF382A', '#0C4B8E')) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'Weight'),
+                     yaxis = list(title = 'Gross horsepower'),
+                     zaxis = list(title = '1/4 mile time')))
+
+print(p)
+```
+
